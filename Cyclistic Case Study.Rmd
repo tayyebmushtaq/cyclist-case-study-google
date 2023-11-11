@@ -1,0 +1,394 @@
+---
+title: "Cyclistic Case Study"
+output:
+  pdf_document:
+    toc: yes
+  html_notebook:
+    toc: yes
+    toc_float: yes
+  html_document:
+    toc: yes
+    df_print: paged
+---
+
+### Background
+
+Cyclistic is a bike-share company in Chicago aiming to maximize annual memberships. As a junior data analyst in the marketing team, my task was to analyze how casual riders and annual members use Cyclistic bikes differently. By understanding these differences, I will help design a new marketing strategy to convert casual riders into annual members. My recommendations must be supported by compelling data insights and professional data visualizations to gain approval from Cyclistic executives.
+
+**Key Points:**
+
+- Cyclistic offers a bike-share program with various bike options, including those for people with disabilities.
+- Lily Moreno is the director of marketing, responsible for promoting the bike-share program.
+- The marketing analytics team analyzes data to guide Cyclistic's marketing strategy.
+- Cyclistic's success relies on increasing the number of annual members.
+- Annual members are more profitable than casual riders.
+- Cyclistic's pricing plans include single-ride passes, full-day passes, and annual memberships.
+- The goal is to convert casual riders into annual members by understanding their preferences and behavior.
+- Cyclistic's historical bike trip data will be analyzed to identify trends and insights.
+
+### Ask
+
+How do annual members and casual riders use Cyclistic bikes differently?.
+
+Following list of deliverables will be provided
+
+1. A clear statement of the business task
+2. A description of all data sources used
+3. Documentation of any cleaning or manipulation of data
+4. A summary of your analysis
+5. Supporting visualizations and key findings
+6. Your top three recommendations based on your analysis
+
+### Prepare
+
+Cyclistic’s historical trip data, which can be downloaded [here](https://divvy-tripdata.s3.amazonaws.com/index.html), will be utilized for trend analysis and identification. The data, provided by Motivate International Inc. under this [license](https://ride.divvybikes.com/data-license-agreement), is organized in monthly CSV files. Being public data, it can be explored for conducting thorough exploratory analysis. While the overall data is complete, some missing values are observed in the data's station name columns. The objective is to examine the differences in bike usage patterns between members and casual riders, leveraging the available data.
+
+
+### Process
+
+In the initial stage, a thorough examination of the data was conducted using Microsoft Excel to gain a comprehensive understanding of its structure. Subsequently, the Tidyverse package in R was utilized to merge data from the past 12 months, employing various syntaxes provided by the package and importing the data from a local disk.
+
+After importing and consolidating all the CSV files into a single data frame, the columns were renamed accordingly. Furthermore, efforts were made to ensure consistency in the data types of each column by converting them to their desired formats, such as numeric, character, and posixct.
+
+To facilitate the identification of missing data, empty values in different columns were replaced with "missing" or "NA" values. Additionally, a new column was introduced to calculate the duration of each ride in minutes, enabling a clear differentiation between member and casual rider usage.  
+
+
+
+Loaded differnt pakage of R programming , used in data analysis.
+
+```{r setup, include=FALSE,error=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r message=FALSE}
+library(tidyverse)
+library(janitor)
+library(skimr)
+library(scales)
+options(scipen = 999)
+```
+
+Read and combine multiple CSV files into a single data frame
+
+```{r message=FALSE}
+CaseStudy1 <- map_dfr(list.files("/Volumes/Personal/Certification/Google data Analytics_Foundation/CaseStudy_1_data", pattern = "\\.csv$", full.names = TRUE), read_csv)
+```
+
+Renamed multiple columns in CaseStudy1 data frame to desired one.
+
+```{r}
+CaseStudy1 <- CaseStudy1 %>%
+  rename(trip_id = ride_id,
+         bike_type = rideable_type,
+         start_time = started_at,
+         end_time = ended_at,
+         from_station_name = start_station_name,
+         from_station_id = start_station_id,
+         to_station_name = end_station_name,
+         to_station_id = end_station_id,
+         start_latitude = start_lat,
+         start_longitude = start_lng,
+         end_latitude = end_lat,
+         end_longitude = end_lng,
+         user_type = member_casual)
+
+```
+
+Converted columns to the desired data types like numeric , character and posixct type.
+
+```{r}
+CaseStudy1=CaseStudy1 %>% mutate_at(vars(trip_id, bike_type, from_station_name, from_station_id, to_station_name, to_station_id, user_type),as.character) %>% mutate_at(vars(start_latitude, start_latitude, end_latitude, end_longitude), as.numeric)
+
+```
+
+```{r}
+CaseStudy1=CaseStudy1 %>% mutate(start_time=as.POSIXct(start_time, tz="UTC")) %>% mutate(end_time=as.POSIXct(end_time, tz="UTC"))
+
+```
+
+Handled missing values and empty values. To do so, I converted empty values into missing values to check the rate of completion in specific column of data frame.
+
+```{r}
+CaseStudy1=CaseStudy1 %>% mutate(across(c(from_station_name, from_station_id, to_station_name, to_station_id),na_if,""))
+
+```
+
+
+
+### Analyze
+
+During the analysis phase, I conducted exploratory data analysis (EDA) using the `skimr` package and R's base function `summary` syntax to gain initial insights into the data.
+
+An examination of the "ride_duration in Mins" column revealed the presence of illogical negative values, suggesting a potential typo error. To address this issue, I removed more than 10,000 rows containing negative values, as they were deemed invalid. Moreover, I identified outliers in the form of extremely large values that could significantly distort and dkew the data. To handle these outliers, I used the `quantile()` function to determine the threshold at which these values became disproportionately large. Box plots were employed as a visualization tool to gain a clearer understanding of the distribution of these outliers within the data.
+
+To facilitate further analysis and uncover usage patterns or spikes at specific days, months, hours, or quarters, I extracted additional information from the "start_time" column. This involved extracting the day of the week, day of the month, month name, month number, hour of the day, and quarter of the year, which were stored in separate columns. Additionally, I determined the seasons (summer, winter, spring, fall) based on the number of months, enabling the identification of any notable variations in usage during specific seasons. Furthermore, I categorized the hours of the day into different sessions, allowing for the identification of trends within specific time frames.
+
+
+Calculated ride duration in minutes
+
+```{r}
+CaseStudy1=CaseStudy1 %>% mutate(Ride_duration_mins= round(as.duration(interval(start_time,end_time))/ dminutes(1),2))
+
+```
+
+Used `skimr` package and `summary` syntax from R base for EDA. Upon analysis , negative values and some extremely large values from `ride_duration_mins` column were discovered and addressed accordingly. I also used `quantile()` function as well to identify exact point beyond which values become exrremely large.
+
+```{r}
+skim_without_charts(CaseStudy1)
+```
+
+```{r}
+summary(CaseStudy1)
+```
+
+```{r}
+quantile(CaseStudy1$Ride_duration_mins, probs = seq(.99, by=.001))
+```
+
+Appplied filter function to remove outliers and negative values reducing records from 5,829,030 to 5,782,287 which is 46,743 and 0.8% of total data.
+
+```{r}
+CaseStudy1=CaseStudy1 %>% filter(Ride_duration_mins>=0, Ride_duration_mins<=114.68 )
+```
+
+
+```{r}
+CaseStudy1 %>%group_by(user_type) %>% summarise(Mean=mean(Ride_duration_mins), Median=median(Ride_duration_mins), SD=sd(Ride_duration_mins), Max=max(Ride_duration_mins) )
+```
+
+
+```{r}
+CaseStudy1 %>% ggplot(aes(x=user_type,y=Ride_duration_mins, fill=user_type))+geom_boxplot()+labs(x="User Type", y="Ride Duration in Mins", fill="User Type", title = "Average Ride Duration by User Types")
+```
+
+```{r}
+CaseStudy1 %>% ggplot(aes(x=bike_type,y=Ride_duration_mins, fill= bike_type))+geom_boxplot()+labs(fill="Bike Type", x= "Bike Type" , y="Ride Duration in Mins",title = "Average Ride Duration by Types of Bike")
+```
+
+```{r}
+CaseStudy1 %>% ggplot(aes(x=user_type,y=Ride_duration_mins, fill= bike_type))+geom_boxplot()+labs(fill="Bike Type", x= "User Type" , y="Ride Duration in Mins", title = "Average Ride Duration by User Types and Bike Types")
+```
+
+Extracted day of the week, day of the month, month number , month name, hour of the day and "quarter of hte year" from `start_time` column and stored them into in new columns.
+
+```{r}
+CaseStudy1=CaseStudy1 %>% mutate(Day=wday(start_time, label= TRUE, abbr= TRUE))
+CaseStudy1=CaseStudy1 %>% mutate(Day_of_Month=day(start_time))
+CaseStudy1=CaseStudy1 %>% mutate(Month=month(start_time, label= TRUE, abbr= TRUE))
+CaseStudy1=CaseStudy1 %>% mutate(Month_number=month(start_time, label= FALSE))
+CaseStudy1=CaseStudy1 %>% mutate(hour=hour(start_time))
+CaseStudy1=CaseStudy1 %>% mutate(Quarter=quarter(start_time))
+```
+
+Categorized rides into seasons and sessions of the day
+
+```{r}
+CaseStudy1=CaseStudy1 %>% mutate(season = case_when(Month_number %in% c(03, 04, 05) ~ "spring",Month_number %in% c(06, 07, 08) ~ "summer",Month_number %in% c(09, 10, 11) ~ "fall",Month_number %in% c(12, 01, 02) ~ "winter",TRUE ~ NA_character_))
+
+CaseStudy1=CaseStudy1 %>% mutate(day_session = case_when(hour %in% c(0:05) ~ "night",hour %in% c(06:11) ~ "morning",hour %in% c(12:17) ~ "afternoon",hour %in% c(18:23) ~ "evening",TRUE ~ NA_character_))
+```
+
+
+### Share
+
+Created a bar plot showing the number of rides by hour of the day and user type
+
+```{r}
+CaseStudy1 %>%
+  count(user_type) %>%
+  ggplot(aes(x = user_type, y = n, fill = user_type)) +labs(x="User Type", y="Number of Rides", fill="User Type", title = "Ride Distribution by User Types")+
+  geom_col()+geom_text(aes(label = paste0(round(n/sum(n)*100), "%")),position = position_stack(vjust = 0.5))+scale_y_continuous(label=comma)
+```
+Created a bar plot showing the number of rides by user type and bike type (flipped axes)
+
+```{r}
+CaseStudy1 %>%
+  count(user_type,bike_type) %>%
+  ggplot(aes(x = user_type, y = n, fill = bike_type)) +labs(x="User Type", y="Number of Rides", fill="Bike Type", title = "Ride Distribution by User Types and Bike Types")+
+  geom_col()+geom_text(aes(label = paste0(round(n/sum(n)*100), "%")),position = position_stack(vjust = 0.5))+scale_y_continuous(labels = comma)
+
+```
+
+
+Created a bar plot showing the number of rides by user type and bike type
+
+```{r}
+CaseStudy1 %>% count(user_type,bike_type) %>% ggplot(aes(x=reorder(bike_type,n),y=n ,fill=user_type))+geom_col()+
+  geom_text(aes(label=paste0(round(n/sum(n)*100),"%")), position = position_stack(vjust = .5))+ labs(x="Bike Type", y="Number of Rides", fill="User Type", title = "Ride's Distribution by Bike Types and User Types")+scale_y_continuous(labels = comma)
+
+```
+
+
+Created a bar plot showing the number of rides by user type and day of the week.
+
+
+```{r}
+CaseStudy1 %>% 
+  group_by(Day, user_type) %>% 
+  count(user_type) %>% 
+  ggplot(aes(x = Day, y = n, fill = user_type)) +
+  geom_col(position = "dodge") +
+  geom_text(aes(label = paste0(round(n/sum(n)*100), "%")), position = position_dodge(width = 0.9), vjust = -0.5) +
+  labs(x = "Day of the Week", y = "Number of Rides", fill = "User Type", title = "Ride distribution by Days of the Week & User Type") +
+  scale_y_continuous(labels = comma)
+```
+
+```{r}
+CaseStudy1 %>% 
+  group_by(Day, user_type) %>% 
+  count(user_type) %>% 
+  ggplot(aes(x = Day, y = n, fill = user_type)) +
+  geom_col() +
+  geom_text(aes(label = paste0(round(n/sum(n)*100), "%")), position = position_stack(vjust = .5)) +
+  labs(x = "Day of the Week", y = "Number of Rides", fill = "User Type", title = "Ride distribution by Days of the Week & User Type") +
+  scale_y_continuous(labels = comma)
+```
+
+
+```{r}
+CaseStudy1 %>% group_by(Day, user_type) %>% summarise(avgride=mean(Ride_duration_mins)) %>% ggplot(aes(x=Day, y=avgride, fill=user_type))+geom_col(position = "dodge")+labs(x="Day of the Week", y="Average Ride Duration",fill="User Type", title = "Average Ride Duration by Day of the Week & User Type ")
+```
+
+
+```{r}
+CaseStudy1 %>% group_by(Day,season) %>% summarise(avgride=mean(Ride_duration_mins)) %>% ggplot(aes(x=Day, y=avgride, fill=season))+geom_col(position = "dodge")+labs(x="Day of the Week", y="Average Ride Duration", title = "Average Ride Duration by Day of the Week & Season of the Year", fill="Season of the Year")
+```
+
+
+
+
+
+```{r}
+CaseStudy1 %>% count(hour, day_session) %>% ggplot(aes(x=hour,y=n, fill=day_session))+geom_col()+labs(x="Hour of the Day",y="Number of Rides", fill="Session of the Day", title = "Ride Distribution by Hour of the Day & Session fo the Day")+scale_y_continuous(labels = comma)
+
+```
+
+```{r}
+CaseStudy1 %>% count(user_type, day_session) %>% ggplot(aes(x=reorder(day_session,n), y=n, fill=user_type))+geom_col()+
+  geom_text(aes(label= paste0(round(n/sum(n)*100), "%")), position = position_stack(vjust = .5))+ labs(x="Session of the Day",y="Number of Rides", fill="User Type", title = "Ride Distribution by Periods of the Day & User Type")+scale_y_continuous(labels = comma)
+
+```
+
+
+Created a stacked bar plot showing the number of rides by hour of the day and user type
+
+```{r}
+CaseStudy1 %>% count(hour,user_type) %>% ggplot(aes(x=hour,y=n)) +geom_col(fill="orange") +labs(x="Hour of the Day",y="Number of Rides", title = "Distribution of Rides by Hour & User Type")+facet_wrap(~user_type)+scale_y_continuous(labels = comma)
+
+```
+```{r}
+CaseStudy1 %>% count(hour, Day, user_type) %>%
+  ggplot(aes(x = hour, y = n, fill=user_type)) +
+  geom_col() +
+  labs(x = "Hour of the Day", y = "Number of Rides", title = "Distribution of Rides by Hour, Day & User Type", fill="User Type") +
+  facet_wrap(~ Day) +
+  scale_y_continuous(labels = comma)
+```
+
+Created a bar plot showing the number of rides by day of the month (ordered) and percentage labels
+
+```{r}
+CaseStudy1 %>% count(Day_of_Month)%>% ggplot(aes(x=reorder(Day_of_Month,n),y=n))+geom_col(fill="darkorange")+
+  geom_text(aes(label=paste0(round(n/sum(n)*100), "%")), position = position_dodge(width = .8), vjust = -0.5)+
+  labs(x="Day of the Month", y="Number of Rides", title = "Ride Distribution by Day of the Month")+scale_y_continuous(labels = comma)
+
+```
+
+
+
+Created a bar plot showing the number of rides by month and user type
+
+```{r}
+CaseStudy1 %>% count(user_type,Month,Month_number) %>% ggplot(aes(x=fct_reorder(Month, Month_number), y=n, fill=user_type))+geom_col()+ labs(x= "Month", y= "Number of Rides", fill="User Type", title = "Ride distribution by Month & User Type")+theme(axis.text.x = element_text(angle = 90))+
+  geom_text(aes(label=paste0(round(n/sum(n)*100),"%")), position = position_stack(vjust = 0.5))+scale_y_continuous(labels = comma)
+
+```
+
+
+Created a stacked bar plot showing the number of rides by month, user type, and bike type
+
+```{r}
+CaseStudy1 %>% count(Month, Month_number, season) %>%
+  ggplot(aes(x = fct_reorder(Month, Month_number), y = n, fill = season)) +
+  geom_col() +
+  labs(x = "Month", y = "Number of Rides", fill = "Season of the Year", title = "Ride distribution by Month & Season of the Year") +
+  theme(axis.text.x = element_text(angle = 90)) +
+  geom_text(aes(label = paste0(round(n/sum(n)*100), "%")),  position = position_dodge(width = .8), vjust = -0.5)
+```
+
+Created a bar plot showing the number of rides by season and user type
+
+```{r}
+CaseStudy1 %>% count(Month, Month_number, day_session) %>%
+  ggplot(aes(x = fct_reorder(Month, Month_number), y = n, fill = day_session)) +
+  geom_col() +
+  labs(x = "Month", y = "Number of Rides", fill = "Session of the Day", title = "Ride distribution by Month & Session of the Day") +
+  theme(axis.text.x = element_text(angle = 90)) +
+  geom_text(aes(label = paste0(round(n/sum(n)*100), "%")), position = position_stack(vjust = 0.5))
+```
+
+Created a bar plot showing the number of rides by season and bike type
+
+```{r}
+CaseStudy1 %>% count(user_type,bike_type,Month,Month_number) %>% ggplot(aes(x=fct_reorder(Month, Month_number), y=n, fill=bike_type))+geom_col()+ labs(x= "Month", y= "Number of Rides", fill="Bike Type", title = "Ride distribution by Month, User Type & Bike Type")+ facet_wrap(~user_type)+theme(axis.text.x = element_text(angle = 90))+scale_y_continuous(labels = comma)
+
+```
+
+Created a bar plot showing the number of rides by day session and user type
+
+```{r}
+CaseStudy1 %>% count(user_type, season) %>% ggplot(aes(x=reorder(season,n), y=n, fill=user_type))+geom_col()+
+  geom_text(aes(label= paste0(round(n/sum(n)*100), "%")), position = position_stack(vjust = .5))+ labs(x="Seasons",y="Number of Rides", fill="User Type", title = "Ride Distribution by Season of the Year & User Type")+scale_y_continuous(labels = comma)
+
+```
+
+```{r}
+CaseStudy1 %>% count(bike_type, season) %>% 
+  ggplot(aes(x=reorder(season, n), y=n, fill=bike_type)) +
+  geom_col(position = "dodge") +
+  geom_text(aes(label = paste0(round(n/sum(n)*100), "%")),
+            position = position_dodge(width = 0.9), vjust = -0.5) +
+  labs(x = "Seasons", y = "Number of Rides", fill = "Bike Type",
+       title = "Ride Distribution by Seasons of the Year & Bike Type") +
+  scale_y_continuous(labels = comma)
+```
+
+
+```{r}
+CaseStudy1 %>% count(Day, season) %>%
+  ggplot(aes(x = season, y = n, fill = Day)) +
+  geom_col(position = "dodge") +
+  labs(x = "Season of the Year", y = "Number of Rides", fill = "Day of the Week", title = "Ride distribution by Day of the Week & Season of the Year")+scale_y_continuous(labels=comma)
+```
+
+
+
+
+
+
+
+
+### Act
+
+#### Analysis:
+
+Casual riders exhibit a wider distribution of data and longer average ride durations compared to members. They account for 39% of the total rides, while members make up 61%. Electric bikes are used 53% of the time, classic bikes 45%, and docked bikes only 2%, exclusively by casual riders. Among members, electric and classic bike usage remains consistent, but casual riders show a 7% higher preference for electric bikes over classic bikes.
+
+Regarding usage patterns, members prefer weekdays (Tue-Fri), while casual riders use bikes more frequently on weekends (Sat-Sun). Average ride durations increase on weekends, with Saturday, Wednesday, and Thursday being the busiest days. The 9th, 10th, and 21st of each month see the highest ride volumes.
+
+The average ride duration for casual riders surpasses that of members. Summer experiences the highest ride volume at 40%, followed by fall (28%) and spring (21%) as peak seasons. Winter remains the off-season with only 9% of the total rides. Afternoons are the busiest time, accounting for 44% of total rides, followed by evenings (28%) and mornings (25%). Nighttime rides are the least common, comprising only 4%.
+
+Based on these statistics, it is evident that annual members primarily use the service for commuting, while casual riders engage in recreational activities, particularly on weekends.
+
+#### Recommendations:
+
+1. Introduce a special membership targeting casual riders during peak usage periods: summer and select months in fall and spring (May - Oct). Consider offering seasonal or weekend-only memberships to align with casual riders' preferences.
+2. Provide exclusive benefits to members, such as extended usage durations and priority access during peak hours, days, or seasons. Implement a pricing structure that offers significant advantages to members over casual riders.
+3. Offer shorter subscription options (e.g., monthly, weekly, or a few months like May-Oct) to accommodate the needs of casual riders who don't require a full-year membership.
+4. Introduce substantial discounts during the winter season to incentivize casual riders and encourage their engagement during the off-season.
+
+
+These recommendations aim to enhance the overall user experience, attract and retain casual riders during peak periods, and provide added value to annual members.
+
+
